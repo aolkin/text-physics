@@ -88,7 +88,6 @@ class TextApp(ShowBase):
         tnp.setColor(random(), random(), random(), 1)
         #tnp.setAntialias(AntialiasAttrib.MMultisample)
 
-
         self.world.attachRigidBody(node)
 
 
