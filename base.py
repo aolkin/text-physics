@@ -23,9 +23,7 @@ class TextApp(ShowBase):
         super().__init__(self)
         #self.tutorialScene()
 
-        self.font = self.loader.loadFont(
-            '/System/Library/Fonts/Supplemental/arial.ttf') 
-        self.font.setRenderMode(TextFont.RMPolygon)
+        self.setBackgroundColor(0, 0, 0)
 
         debugNode = BulletDebugNode('Debug')
         debugNode.showWireframe(True)
@@ -35,6 +33,16 @@ class TextApp(ShowBase):
         debugNP = self.render.attachNewNode(debugNode)
         debugNP.show()
 
+        self.font = self.loader.loadFont(
+            '/System/Library/Fonts/Supplemental/Arial Bold.ttf')
+        self.font.setPixelsPerUnit(60)
+        self.font.setPageSize(512, 512)
+        self.font.setRenderMode(TextFont.RMSolid)
+
+        self.camera.setPos(0, -20, 10)
+        self.camera.setHpr(0, -20, 0)
+        #self.taskMgr.add(self.spinCameraTask, "spinCameraTask")
+        self.disableMouse()
 
         self.world = BulletWorld()
         self.world.setGravity(Vec3(0, 0, -.1))
@@ -60,9 +68,13 @@ class TextApp(ShowBase):
         self.targets.append(ghost)
 
     def addText(self, value, x=0, y=0, z=0):
-        text = TextNode("T1")
+        text = TextNode("text")
         text.setFont(self.font)
         text.setText(value)
+
+        m = text.getTransform()
+        m[1][1] = 0.1
+        text.setTransform(m)
 
         shape = BulletBoxShape(Vec3(0.5, 0.5, 0.5))
         node = BulletRigidBodyNode("Text")
@@ -71,11 +83,14 @@ class TextApp(ShowBase):
         
         np = self.render.attachNewNode(node)
         np.setPos(x, y, z)
-        np.attachNewNode(text)
+
+        tnp = np.attachNewNode(text)
+        tnp.setColor(random(), random(), random(), 1)
+        #tnp.setAntialias(AntialiasAttrib.MMultisample)
+
 
         self.world.attachRigidBody(node)
 
-        #self.render.attachNewNode(text)#.setAntialias(AntialiasAttrib.MMultisample)
 
     def update(self, task):
         dt = globalClock.getDt()
