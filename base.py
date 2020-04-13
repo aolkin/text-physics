@@ -92,7 +92,7 @@ class LaunchableText:
         self.rbNode = BulletRigidBodyNode("Text")
         self.rootNp = parent.attachNewNode(self.rbNode)
         self.textNp = self.rootNp.attachNewNode(self.textNode)
-        self.textNp.setScale(1.8)
+        self.textNp.setScale(2)
 
         self.rbNode.setFriction(0)
         self.rbNode.setRestitution(1)
@@ -334,7 +334,7 @@ class TextApp(ShowBase):
 
         angular = Vec3(random(), random(), random())
         text.launch(velocity * (props["launchStrength"] * 10 + 3),
-                    angular * props["launchStrength"] * 0)
+                    angular * props["launchStrength"] * 5)
 
         self.floaters.append(text)
         del self.launchers[msg["client_id"]]
