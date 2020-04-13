@@ -3,6 +3,8 @@
 from math import pi, sin, cos
 from random import random, randint
 
+from hotqueue import HotQueue
+
 import sys
 
 import pdir
@@ -70,11 +72,61 @@ def makeLight(i=1):
     light.setAttenuation((1, 0.01, 0.0001))
     return light
 
-class TextApp(ShowBase):
+class LaunchableText:
+    def __init__(self, parent, world, font=None):
+        self.textNode = TextNode("text")
+        if font:
+            self.textNode.setFont(font)
+            m = self.textNode.getTransform()
+            m[1][1] = 0.1
+            self.textNode.setTransform(m)
 
+        self.rbNode = BulletRigidBodyNode("Text")
+        self.rootNp = parent.attachNewNode(self.rbNode)
+        self.textNp = self.rootNp.attachNewNode(self.textNode)
+
+        self.rbNode.setFriction(0)
+        self.rbNode.setRestitution(1)
+        self.rbNode.setAngularDamping(0.3)
+        self.rbNode.setLinearDamping(0)
+        self.rbNode.setMass(1)
+        self.rbNode.setDeactivationEnabled(False)
+        self.rbNode.setKinematic(True)
+
+        world.attachRigidBody(self.rbNode)
+
+    def setText(self, value):
+        self.textNode.setText(value)
+
+        ul, lr = self.textNp.getTightBounds()
+        halfExtents = (lr - ul) / 2
+        self.textNp.setPos(-halfExtents - ul)
+
+        if hasattr(self, "bulletShape"):
+            self.rbNode.removeShape(self.bulletShape)
+        self.bulletShape = BulletBoxShape(halfExtents)
+        self.rbNode.addShape(self.bulletShape)
+
+    def setColor(self, color):
+        self.textNp.setColor(color)    
+
+    def setPos(self, pos):
+        self.rootNp.setPos(pos)
+
+    def setHpr(self, hpr):
+        self.rootNp.setHpr(hpr)
+
+    def launch(self, linear, angular):
+        self.rbNode.setKinematic(False)
+        self.rbNode.setLinearVelocity(linear)
+        self.rbNode.setAngularVelocity(angular)
+
+class TextApp(ShowBase):
     def __init__(self):
         super().__init__(self)
-        #self.tutorialScene()
+
+        self.queue = HotQueue("text-updates")
+        self.msgsPerFrameLimit = 10
 
         self.setBackgroundColor(0, 0, 0)
         self.setFrameRateMeter("fps" in sys.argv)
@@ -95,15 +147,13 @@ class TextApp(ShowBase):
         self.font.setRenderMode(TextFont.RMSolid)
 
         self.camera.setPos(0, -90, 0)
-        #self.camera.setHpr(0, -20, 0)
-        #self.taskMgr.add(self.spinCameraTask, "spinCameraTask")
         self.disableMouse()
 
-        self.rbNodes = []
         self.paused = "pause" in sys.argv
 
         self.world = BulletWorld()
-        self.world.setGravity(Vec3(0, 0, 0))
+        if "gravity" in sys.argv:
+            self.world.setGravity(Vec3(0, 0, -3))
         self.world.setDebugNode(debugNP.node())
         self.taskMgr.add(self.update, 'update')
 
@@ -131,15 +181,20 @@ class TextApp(ShowBase):
         self.render.setAntialias(AntialiasAttrib.MAuto)
 
         if "sample" in sys.argv:
+            self.sampleTexts = []
             for i in range(5):
-                self.addText("Sample %s" % i,
-                             random() * 5, -24, random() * 5)
+                self.sampleTexts.append(self.addText("Sample %s" % i,
+                                                     (random() * 10 - 5,
+                                                      random() * 10 - 5,
+                                                      random() * 10 - 5)))
+            self.accept('l', self.sampleLaunch)
 
         self.targets = []
-        self.createTarget("A", -2, 5, -1)
+        #self.createTarget("A", -2, 5, -1)
 
         self.accept('1', self.debugCamera)
         self.accept('2', self.debugNodes)
+        self.accept('k', self.disableKinematic)
         self.accept('c', self.oobe)
         self.accept('g', self.toggleGravity)
         self.accept('p', self.pause)
@@ -153,21 +208,49 @@ class TextApp(ShowBase):
             i, i.getGravity(), i.getLinearVelocity(), i.getAngularVelocity())
                          for i in self.world.getRigidBodies()]))
 
+    def sampleLaunch(self):
+        for i in self.sampleTexts:
+            i.launch((random() * 10 - 5, random() * 10 - 5, random() * 10 - 5),
+                     (random() * 10 - 5, random() * 10 - 5, random() * 10 - 5))
+            
+    def disableKinematic(self):
+        for i in self.world.getRigidBodies():
+            i.setKinematic(not i.isKinematic())
+
     def pause(self):
         self.paused = not self.paused
+        print("Physics simulation is {} paused.".format(
+            "now" if self.paused else "no longer"))
 
     def toggleGravity(self):
-        if self.world.getGravity()[1] > 0:
+        if self.world.getGravity()[2] > 0:
             self.world.setGravity((0, 0, 0))
-        elif self.world.getGravity()[1] == 0:
-            self.world.setGravity((0, -10, 0))
+        elif self.world.getGravity()[2] == 0:
+            self.world.setGravity((0, 0, -5))
         else:
-            self.world.setGravity((0, 10, 0))
+            self.world.setGravity((0, 0, 5))
+        print("New Gravity: ", self.world.getGravity())
 
     def update(self, task):
         dt = globalClock.getDt()
         if not self.paused:
             self.world.doPhysics(dt)
+
+        msg = self.queue.get()
+        processed = 0
+        while msg:
+            print(msg)
+            if msg["props"]["text"]:
+                if msg["action"] == "update":
+                    self.processUpdate(msg)
+                elif msg["action"] == "launch":
+                    self.processUpdate(msg)
+                    self.processLaunch(msg)
+            processed += 1
+            if processed < self.msgsPerFrameLimit:
+                msg = self.queue.get()
+            else:
+                msg = None
         return task.cont
 
     def createTarget(self, name, x=0, y=0, z=0):
@@ -179,43 +262,11 @@ class TextApp(ShowBase):
         self.world.attachGhost(ghost)
         self.targets.append(ghost)
 
-    def addText(self, value, x=0, y=0, z=0):
-        text = TextNode("text")
-        text.setFont(self.font)
+    def addText(self, value, pos=Point3(0, 0, 0)):
+        text = LaunchableText(self.textNp, self.world, self.font)
         text.setText(value)
-        m = text.getTransform()
-        m[1][1] = 0.1
-        text.setTransform(m)
-
-        node = BulletRigidBodyNode("Text")
-        np = self.textNp.attachNewNode(node)
-        np.setPos(x, y, z)
-        tnp = np.attachNewNode(text)
-        tnp.setColor(random(), random(), random(), 1)
-
-        ul, lr = tnp.getTightBounds()
-        halfExtents = (lr - ul) / 2
-        tnp.setPos(-halfExtents - ul)
-        shape = BulletBoxShape(halfExtents)
-        node.addShape(shape)
-        node.setMass(1)
-        node.setLinearSleepThreshold(0)
-        node.setFriction(0)
-        node.setRestitution(1)
-        node.setAngularDamping(0.5)
-        node.setLinearDamping(0)
-
-        self.rbNodes.append(node)
-
-        self.world.attachRigidBody(node)
-
-    def spinCameraTask(self, task):
-        angleDegrees = abs(task.time * 6.0 % 180 - 90) - 45
-        angleRadians = angleDegrees * (pi / 180.0)
-        self.camera.setPos(20 * sin(angleRadians),
-                           -20 * cos(angleRadians), 10)
-        self.camera.setHpr(angleDegrees, 0, 0)
-        return Task.cont
+        text.setPos(pos)
+        return text
 
 app = TextApp()
 app.run()
