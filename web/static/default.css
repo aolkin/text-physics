@@ -1,0 +1,51 @@
+.bt-footer {
+    margin: 1em;
+    text-align: center;
+}
+
+.bt-footer hr {
+    margin: 2em auto 1em;
+}
+
+.container {
+    max-width: 400px;
+}
+
+#interact-area {
+  touch-action: none;
+  position: relative;
+  width: 300px;
+  height: 300px;
+  background-color: #ccc;
+  padding-top: 50px;
+  border-radius: 1em;
+  box-shadow: 0px 0px 12px 15px #ccc;
+  margin: 45px auto;
+}
+
+#arrow {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+}
+
+#box {
+    width: 200px;
+    height: 200px;
+    border: 1px dashed #999;
+    margin: 0 50px;
+}
+
+#launch {
+    width: 100px;
+    height: 100px;
+    position: absolute;
+    top: 112px;
+    left: 100px;
+    text-align: center;
+    cursor: pointer;
+}
+
+button[disabled] {
+    cursor: not-allowed;
+}

@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>3D Playground</title>
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    
+    <meta name="theme-color" content="#eb1c23">
+    <meta name="msapplication-navbutton-color" content="#eb1c23">
+    
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/font-awesome/4.7.0/css/font-awesome.min.css" integrity="sha384-wvfXpqpZZVQGK6TAh5PVlGOfQNHSoD2xbE+QkPxCAFlNEevoEH3Sl0sibVcOQVnN" crossorigin="anonymous">
+    <link rel="stylesheet" href="/static/default.css">
+  </head>
+  <body>
+    <div class="container">
+      <header>
+	<h2 class="text-center mt-5 mb-4">Text Launcher</h2>
+      </header>
+      <main>
+	<div class="form-group row">
+	  <label for="color" class="col-sm-2 col-form-label">Color</label>
+	  <div class="col">
+	    <input type="color" class="form-control" id="color">
+	  </div>
+	</div>
+	<div class="form-group row">
+	  <label for="text" class="col-sm-2 col-form-label">Text</label>
+	  <div class="col">
+	    <input type="text" class="form-control" id="text"
+		   placeholder="Enter a single word">
+	  </div>
+	</div>
+	<div class="help-text text-center">
+	  Position your launcher, then press and hold the launch button to
+	  charge and release.</div>
+	<div id="interact-area">
+	  <svg id="arrow" viewBox="0 0 100 100">
+	    <polygon points="50,0 75,25 62.5,25 62.5,100 37.5,100 37.5,25 25,25"></polygon>
+	  </svg>
+	  <div id="box"></div>
+	  <i class="fa fa-upload fa-5x" id="launch"></i>
+	</div>
+	<div class="form-group">
+	  <label for="zAngle">Z-Angle</label>
+	  <input type="range" class="form-control-range" id="zAngle"
+		 min="-85" max="85" value="0">
+	  <div class="help-text">
+	    Adjust the front-back orientation of your launcher.</div>
+	</div>
+	<div class="form-group">
+	  <label for="planarAngle">Rotation</label>
+	  <input type="range" class="form-control-range" id="planarAngle"
+		 min="-85" max="85" value="0">
+	  <div class="help-text">
+	    You can also use touch gestures to rotate your launcher.</div>
+	</div>
+	<div class="form-group">
+	  <label for="z">Z-coordinate</label>
+	  <input type="range" class="form-control-range" id="z"
+		 min="-1" max="1" value="0" step="0.01">
+	  <div class="help-text">
+	    You can also use touch gestures to move your launcher.</div>
+	</div>
+      </main>
+      <footer class="bt-footer">
+	<hr>
+	<div>&copy;2020 Aaron Olkin</div>
+      </footer>
+    </div>
+
+    <!-- Modal -->
+    <div class="modal fade" id="launchedModal" tabindex="-1" role="dialog"
+	 data-backdrop="static">
+      <div class="modal-dialog" role="document">
+	<div class="modal-content">
+	  <div class="modal-header">
+            <h5 class="modal-title">Launching...</h5>
+	  </div>
+	  <div class="modal-body">
+            Your word is on its way! You may continue momentarily.
+	  </div>
+	  <div class="modal-footer">
+            <button type="button" class="btn btn-primary" data-dismiss="modal"
+		    id="continueButton">Continue</button>
+	  </div>
+	</div>
+      </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.3.1.min.js" integrity="sha256-FgpCb/KJQlLNfOu91ta32o/NMZxltwRo8QtmkMRdAu8=" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.12.9/umd/popper.min.js"></script>
+    <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.4.1/js/bootstrap.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/interactjs@1.9.9/dist/interact.min.js" integrity="sha256-n9m4d4pMYkS4Y4DIyKytAXPuasbTpQEnIgBqCZbYpI4=" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/lodash@4.17.15/lodash.min.js" integrity="sha256-VeNaFBVDhoX3H+gJ37DpT/nTuZTdjYro9yBruHjVmoQ=" crossorigin="anonymous"></script>
+
+    <script src="/static/realtime.js"></script>
+
+  </body>
+</html>
