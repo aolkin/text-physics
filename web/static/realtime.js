@@ -41,8 +41,8 @@ $(() => {
 	let x = props.x = Math.clamp(props.x, -1, 1);
 	let y = props.y = Math.clamp(props.y, -1, 1);
 	let z = props.z = Math.clamp(props.z, -1, 1);
-	props.planarAngle = Math.clamp(props.planarAngle, -85, 85);
-	props.zAngle = Math.clamp(props.zAngle, -85, 85);
+	props.planarAngle = Math.clamp(props.planarAngle, -89, 89);
+	props.zAngle = Math.clamp(props.zAngle, -89, 89);
 
 	if (Math.abs(x) != 1 && Math.abs(y) != 1) {
 	    if (Math.abs(x) > Math.abs(y)) {
@@ -89,6 +89,12 @@ $(() => {
     updateArrow(true);
 
     $("input").on("input", function() {
+	if ($(this).prop("id") == "text" &&
+	    $(this).val().indexOf(" ") != -1) {
+	    alert("Please write only a single word!");
+	    return false;
+	}
+
 	props[$(this).prop("id")] = $(this).val();
 	updateArrow();
     });
@@ -96,7 +102,6 @@ $(() => {
     let i = interact($('#interact-area')[0]).gesturable({
 	listeners: {
 	    move (event) {
-		console.log(event.scale);
 		props.planarAngle += event.da;
 		props.z += Math.log(event.scale) / 100;
 		updateArrow();
@@ -115,7 +120,7 @@ $(() => {
     function updateLaunchStrength() {
 	if (!$("#launch").data("launchStart")) { return false; }
 	let dt = new Date().getTime() - $("#launch").data("launchStart");
-	props.launchStrength = Math.clamp(dt / 5000, 0.1, 1);
+	props.launchStrength = Math.clamp(Math.pow(dt / 5000, .5), 0.1, 1);
 	$("#launch").css("transform", `scale(${props.launchStrength * 2})`);
 	requestAnimationFrame(updateLaunchStrength);
     }
@@ -146,4 +151,6 @@ $(() => {
 	    $("#continueButton").prop("disabled", false);
 	}, 2000);
     });
+
+    $("#continueButton").click(sendUpdate);
 });

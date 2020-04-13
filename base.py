@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 
-from math import pi, sin, cos
+from math import pi, sin, cos, radians, hypot
 from random import random, randint
+from collections import defaultdict
 
+from webcolors import hex_to_rgb
 from hotqueue import HotQueue
 
 import sys
@@ -36,6 +38,10 @@ if "help" in sys.argv:
     """)
     exit(0)
 
+X_EXTENT = 32
+Y_EXTENT = 24
+Z_EXTENT = 18
+
 def makeBoundaryBox(render, world):
     boundaryNode = BulletRigidBodyNode("Boundary")
     boundaryNode.setFriction(0)
@@ -47,12 +53,12 @@ def makeBoundaryBox(render, world):
     cubeNp.attachNewNode(cubeNode)
 
     for pos, shape in (
-            ((0, 0,  -18), Vec3(32, 24,  1)),
-            ((0, 0,   18), Vec3(32, 24,  1)),
-            ((0, -24,  0), Vec3(32,  1, 18)),
-            ((0,  24,  0), Vec3(32,  1, 18)),
-            ((-32, 0,  0), Vec3( 1, 24, 18)),
-            (( 32, 0,  0), Vec3( 1, 24, 18)),
+            ((0, 0,  -Z_EXTENT), Vec3(X_EXTENT, Y_EXTENT,  1)),
+            ((0, 0,   Z_EXTENT), Vec3(X_EXTENT, Y_EXTENT,  1)),
+            ((0, -Y_EXTENT,  0), Vec3(X_EXTENT,  1, Z_EXTENT)),
+            ((0,  Y_EXTENT,  0), Vec3(X_EXTENT,  1, Z_EXTENT)),
+            ((-X_EXTENT, 0,  0), Vec3( 1, Y_EXTENT, Z_EXTENT)),
+            (( X_EXTENT, 0,  0), Vec3( 1, Y_EXTENT, Z_EXTENT)),
     ):
         boundaryShape = BulletBoxShape(shape)
         boundaryNode.addShape(boundaryShape,
@@ -81,9 +87,12 @@ class LaunchableText:
             m[1][1] = 0.1
             self.textNode.setTransform(m)
 
+        self.halfExtents = (0, 0, 0)
+
         self.rbNode = BulletRigidBodyNode("Text")
         self.rootNp = parent.attachNewNode(self.rbNode)
         self.textNp = self.rootNp.attachNewNode(self.textNode)
+        self.textNp.setScale(1.8)
 
         self.rbNode.setFriction(0)
         self.rbNode.setRestitution(1)
@@ -93,19 +102,32 @@ class LaunchableText:
         self.rbNode.setDeactivationEnabled(False)
         self.rbNode.setKinematic(True)
 
-        world.attachRigidBody(self.rbNode)
+        world.attach(self.rbNode)
+        self.world = world
+
+    def destroy(self):
+        self.rootNp.detachNode()
+        self.world.remove(self.rbNode)
 
     def setText(self, value):
-        self.textNode.setText(value)
-
-        ul, lr = self.textNp.getTightBounds()
-        halfExtents = (lr - ul) / 2
-        self.textNp.setPos(-halfExtents - ul)
-
-        if hasattr(self, "bulletShape"):
+        if hasattr(self, "bulletShape") and self.bulletShape:
             self.rbNode.removeShape(self.bulletShape)
-        self.bulletShape = BulletBoxShape(halfExtents)
-        self.rbNode.addShape(self.bulletShape)
+            self.bulletShape = None
+
+        self.textNode.setText(value)
+        self.textNp.setPos(0, 0, 0)
+        self.halfExtents = (0, 0, 0)
+
+        if self.textNp.getTightBounds():
+            ul, lr = self.textNp.getTightBounds()
+            self.halfExtents = (lr - ul) / 2
+            self.textNp.setPos(-self.halfExtents - ul)
+            
+            self.bulletShape = BulletBoxShape(self.halfExtents)
+            self.rbNode.addShape(self.bulletShape)
+
+    def getHalfExtents(self):
+        return self.halfExtents
 
     def setColor(self, color):
         self.textNp.setColor(color)    
@@ -115,6 +137,12 @@ class LaunchableText:
 
     def setHpr(self, hpr):
         self.rootNp.setHpr(hpr)
+
+    def getPos(self):
+        return self.rootNp.getPos()
+
+    def getHpr(self):
+        return self.rootNp.getHpr()
 
     def launch(self, linear, angular):
         self.rbNode.setKinematic(False)
@@ -162,12 +190,12 @@ class TextApp(ShowBase):
 
         self.textNp = self.render.attachNewNode("TextNodes")
 
-        light = makeLight(2)
+        light = makeLight(1)
         lightNp = render.attachNewNode(light)
         lightNp.setPos(24, -30, 12)
         self.textNp.setLight(lightNp)
 
-        light = makeLight(2)
+        light = makeLight(1)
         lightNp = render.attachNewNode(light)
         lightNp.setPos(-24, -30, -12)
         self.textNp.setLight(lightNp)
@@ -188,6 +216,10 @@ class TextApp(ShowBase):
                                                       random() * 10 - 5,
                                                       random() * 10 - 5)))
             self.accept('l', self.sampleLaunch)
+
+        self.launchers = defaultdict(
+            lambda: LaunchableText(self.textNp, self.world, self.font))
+        self.floaters = []
 
         self.targets = []
         #self.createTarget("A", -2, 5, -1)
@@ -232,26 +264,80 @@ class TextApp(ShowBase):
         print("New Gravity: ", self.world.getGravity())
 
     def update(self, task):
-        dt = globalClock.getDt()
-        if not self.paused:
-            self.world.doPhysics(dt)
-
         msg = self.queue.get()
         processed = 0
         while msg:
-            print(msg)
-            if msg["props"]["text"]:
-                if msg["action"] == "update":
-                    self.processUpdate(msg)
-                elif msg["action"] == "launch":
-                    self.processUpdate(msg)
-                    self.processLaunch(msg)
+            if msg["action"] == "leave":
+                self.launchers[msg["client_id"]].destroy()
+                del self.launchers[msg["client_id"]]
+            elif msg["action"] == "update":
+                self.processUpdate(msg)
+            elif msg["action"] == "launch":
+                self.processUpdate(msg)
+                self.processLaunch(msg)
             processed += 1
             if processed < self.msgsPerFrameLimit:
                 msg = self.queue.get()
             else:
                 msg = None
+
+        dt = globalClock.getDt()
+        if not self.paused:
+            self.world.doPhysics(dt)
         return task.cont
+
+    def processUpdate(self, msg):
+        props = msg["props"]
+        text = self.launchers[msg["client_id"]]
+        text.setText(props["text"])
+        text.setColor(Vec3(*hex_to_rgb(props["color"])) / 256)
+
+        props["y"] *= -1
+        props["z"] *= -1
+        if abs(props["x"]) != 1 and abs(props["y"]) != 1:
+            if abs(props["x"]) > abs(props["y"]):
+                props["x"] = 1 if props["x"] > 0 else -1
+            else:
+                props["y"] = 1 if props["y"] > 0 else -1;
+
+        x = props["x"] * X_EXTENT * .95
+        y = props["z"] * Y_EXTENT * .92
+        z = props["y"] * Z_EXTENT * .90
+        if abs(props["x"]) == 1:
+            x += text.getHalfExtents()[0] * -props["x"]
+        if abs(props["y"]) == 1:
+            z += text.getHalfExtents()[0] * -props["y"]
+            props["planarAngle"] += 90 * props["y"]
+        text.setPos(Point3(x, y, z))
+
+        if abs(props["x"]) == 1:
+            hpr = Vec3(props["zAngle"], 0, props["planarAngle"])
+        else:
+            hpr = Vec3(0, -props["zAngle"], props["planarAngle"])
+        text.setHpr(hpr)
+
+    def processLaunch(self, msg):
+        props = msg["props"]
+        text = self.launchers[msg["client_id"]]
+        
+        hpr = text.getHpr()
+        if abs(props["x"]) == 1:
+            velocity = Vec3(
+                -props["x"] * cos(radians(hpr[0])) * cos(radians(hpr[2])),
+                -props["x"] * sin(radians(hpr[0])),
+                -props["x"] * -sin(radians(hpr[2])))
+        else:
+            velocity = Vec3(
+                cos(radians(hpr[2])),
+                -sin(radians(hpr[1])),
+                -cos(radians(hpr[1])) * sin(radians(hpr[2])))
+
+        angular = Vec3(random(), random(), random())
+        text.launch(velocity * (props["launchStrength"] * 10 + 3),
+                    angular * props["launchStrength"] * 0)
+
+        self.floaters.append(text)
+        del self.launchers[msg["client_id"]]
 
     def createTarget(self, name, x=0, y=0, z=0):
         shape = BulletSphereShape(0.5)

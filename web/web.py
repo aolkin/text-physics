@@ -26,7 +26,11 @@ class QueueWebSocket(tornado.websocket.WebSocketHandler):
         queue.put(data)
 
     def on_close(self):
-        pass
+        data = {
+            "action": "leave",
+            "client_id": self.client_id
+        }
+        queue.put(data)
 
 class MainHandler(tornado.web.RequestHandler):
     def get(self):
