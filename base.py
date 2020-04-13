@@ -224,16 +224,11 @@ class TextApp(ShowBase):
         self.targets = []
         #self.createTarget("A", -2, 5, -1)
 
-        self.accept('1', self.debugCamera)
-        self.accept('2', self.debugNodes)
+        self.accept('1', self.debugNodes)
         self.accept('k', self.disableKinematic)
         self.accept('c', self.oobe)
         self.accept('g', self.toggleGravity)
         self.accept('p', self.pause)
-
-    def debugCamera(self):
-        self.enableMouse()
-        print(self.camera.getPos(), self.camera.getHpr())
 
     def debugNodes(self):
         print("\n".join(["{}\tGravity: {}\tLinear: {}\tAngular: {}".format(
