@@ -95,7 +95,7 @@ class LaunchableText:
         self.textNp = self.rootNp.attachNewNode(self.textNode)
         self.textNp.setScale(2)
 
-        self.rbNode.setFriction(0)
+        self.rbNode.setFriction(0.2)
         self.rbNode.setRestitution(1)
         self.rbNode.setAngularDamping(0.3)
         self.rbNode.setLinearDamping(0)
@@ -133,17 +133,13 @@ class LaunchableText:
     def setColor(self, color):
         self.textNp.setColor(color)    
 
-    def setPos(self, pos):
-        self.rootNp.setPos(pos)
-
-    def setHpr(self, hpr):
-        self.rootNp.setHpr(hpr)
-
-    def getPos(self):
-        return self.rootNp.getPos()
-
-    def getHpr(self):
-        return self.rootNp.getHpr()
+    def __getattr__(self, name):
+        if hasattr(self.rootNp, name):
+            return getattr(self.rootNp, name)
+        elif hasattr(self.rbNode, name):
+            return getattr(self.rbNode, name)
+        else:
+            raise AttributeError()
 
     def launch(self, linear, angular):
         self.rbNode.setKinematic(False)
@@ -165,7 +161,7 @@ class TextApp(ShowBase):
         debugNode.showWireframe(True)
         debugNode.showConstraints(True)
         debugNode.showBoundingBoxes(False)
-        debugNode.showNormals(False)
+        debugNode.showNormals(True)
         debugNP = self.render.attachNewNode(debugNode)
         if "bullet" in sys.argv: debugNP.show()
 
@@ -191,11 +187,12 @@ class TextApp(ShowBase):
 
         self.textNp = self.render.attachNewNode("TextNodes")
 
-        self.updateCamera = True
         self.cameraCard = CameraCard(self.render)
         self.cameraCard.setScale(Vec3(-16, 1, 9) * 4)
         self.cameraCard.setTwoSided(True)
         self.cameraCard.setPos((8 * 4, 22, -4.5 * 4))
+        if "nocamera" in sys.argv:
+            self.toggleCameraBg()
 
         light = makeLight(1)
         lightNp = render.attachNewNode(light)
@@ -228,8 +225,8 @@ class TextApp(ShowBase):
             lambda: LaunchableText(self.textNp, self.world, self.font))
         self.floaters = []
 
-        self.targets = []
-        #self.createTarget("A", -2, 5, -1)
+        self.sinks = []
+        self.createSink("A", 0, 23, 0)
 
         self.accept('1', self.debugNodes)
         self.accept('k', self.disableKinematic)
@@ -291,8 +288,12 @@ class TextApp(ShowBase):
             else:
                 msg = None
 
-        self.updateCamera = not self.updateCamera
-        self.updateCamera and self.cameraCard.update()
+        target = self.sinks[0].getPos()
+        for text in self.floaters:
+            vec = text.rootNp.getPos() - target
+            text.applyCentralForce(-vec / pow(vec.length(), 2) * 100 )
+
+        self.cameraCard.update()
 
         dt = globalClock.getDt()
         if not self.paused:
@@ -346,20 +347,20 @@ class TextApp(ShowBase):
                 -cos(radians(hpr[1])) * sin(radians(hpr[2])))
 
         angular = Vec3(random(), random(), random())
-        text.launch(velocity * (props["launchStrength"] * 10 + 3),
+        text.launch(velocity * (props["launchStrength"] * 20 + 3),
                     angular * props["launchStrength"] * 5)
 
         self.floaters.append(text)
         del self.launchers[msg["client_id"]]
 
-    def createTarget(self, name, x=0, y=0, z=0):
+    def createSink(self, name, x=0, y=0, z=0):
         shape = BulletSphereShape(0.5)
-        ghost = BulletGhostNode('GhostTarget_'+name)
-        ghost.addShape(shape)
-        ghostNP = self.render.attachNewNode(ghost)
-        ghostNP.setPos(x, y, z)
-        self.world.attachGhost(ghost)
-        self.targets.append(ghost)
+        ghostNode = BulletGhostNode('GhostSink_'+name)
+        ghostNode.addShape(shape)
+        ghostNp = self.render.attachNewNode(ghostNode)
+        ghostNp.setPos(x, y, z)
+        self.world.attachGhost(ghostNode)
+        self.sinks.append(ghostNp)
 
     def addText(self, value, pos=Point3(0, 0, 0)):
         text = LaunchableText(self.textNp, self.world, self.font)
