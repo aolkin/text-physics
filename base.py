@@ -11,7 +11,9 @@ import pdir
 from panda3d.core import loadPrcFileData
 #loadPrcFileData("", "want-directtools #t")
 #loadPrcFileData("", "want-tk #t")
-loadPrcFileData('', 'win-size 1280 720') 
+loadPrcFileData('', 'win-size 1280 720')
+loadPrcFileData('', 'framebuffer-multisample 1')
+loadPrcFileData('', 'multisamples 4')
 
 from panda3d.core import *
 from panda3d.bullet import *
@@ -21,7 +23,7 @@ from direct.task import Task
 from direct.actor.Actor import Actor
 from direct.interval.IntervalGlobal import Sequence
 
-from cube import makeCube
+from util3d.cube import makeCube
 
 if "help" in sys.argv:
     print("""Command Line Arguments:
@@ -38,28 +40,9 @@ def makeBoundaryBox(render, world):
     boundaryNode.setRestitution(1)
     boundaryNp = render.attachNewNode(boundaryNode)
 
-    vdata = GeomVertexData('', GeomVertexFormat.getV3(), Geom.UHStatic)
-    vdata.setNumRows(8)
-    vertices = GeomVertexWriter(vdata, "vertex")
-    for i in (-1, 1):
-        vertices.addData3(-1, -1, i)
-        vertices.addData3(-1, 1, i)
-        vertices.addData3(1, -1, i)
-        vertices.addData3(1, 1, i)
-    prim = GeomTriangles(Geom.UHStatic)
-    for a, b, c, d in (
-            (0, 1, 2, 3),
-            (0, 1, 4, 5),
-            (1, 3, 5, 7),
-            (3, 2, 7, 6),
-            (2, 0, 6, 4),
-            (4, 5, 6, 7)
-    ):
-        prim.addVertices(c, b, a)
-        prim.addVertices(b, c, d)
-    geom = Geom(vdata)
-    prim.closePrimitive()
-    geom.addPrimitive(prim)
+    cubeNode = makeCube()
+    cubeNp = NodePath("cube")
+    cubeNp.attachNewNode(cubeNode)
 
     for pos, shape in (
             ((0, 0,  -18), Vec3(32, 24,  1)),
@@ -73,14 +56,19 @@ def makeBoundaryBox(render, world):
         boundaryNode.addShape(boundaryShape,
                               TransformState.makePos(pos))
         if pos[1] >= 0:
-            node = GeomNode('square')
-            node.addGeom(geom)
-            np = render.attachNewNode(node)
+            np = render.attachNewNode("boundary-cube")
             np.setPos(pos)
             np.setTwoSided(True)
             np.setScale(shape)
-            np.setColor((1, 1, 1, 0.5))
+            np.setColor((0.5, 0.5, 0.5, 0.5))
+            cubeNp.instanceTo(np)
     world.attachRigidBody(boundaryNode)
+
+def makeLight(i=1):
+    light = PointLight("Light")
+    light.setColor((i, i, i, 1))
+    light.setAttenuation((1, 0.01, 0.0001))
+    return light
 
 class TextApp(ShowBase):
 
@@ -115,31 +103,37 @@ class TextApp(ShowBase):
         self.paused = "pause" in sys.argv
 
         self.world = BulletWorld()
-        self.world.setGravity(Vec3(0, 10, 0))
+        self.world.setGravity(Vec3(0, 0, 0))
         self.world.setDebugNode(debugNP.node())
         self.taskMgr.add(self.update, 'update')
 
-        makeBoundaryBox(self.render, self.world)
+        self.boundsNp = self.render.attachNewNode("BoundaryBox")
+        makeBoundaryBox(self.boundsNp, self.world)
 
-        light = PointLight("Light")
-        light.setColor((10, 0, 10, 1))
-        #light.setAttenuation((1, 0, 0.5))
+        self.textNp = self.render.attachNewNode("TextNodes")
+
+        light = makeLight(2)
         lightNp = render.attachNewNode(light)
-        lightNp.setPos(0, -90, 0)
-        self.render.setLight(lightNp)
-        #light.setShadowCaster(True, 512, 512)
+        lightNp.setPos(24, -30, 12)
+        self.textNp.setLight(lightNp)
+
+        light = makeLight(2)
+        lightNp = render.attachNewNode(light)
+        lightNp.setPos(-24, -30, -12)
+        self.textNp.setLight(lightNp)
 
         ambient = PointLight("Ambient")
-        ambient.setColor((0, .2, 0, 1))
-        #ambient.setAttenuation((1, 0, 0.5))
+        ambient.setColor((.5, .5, .5, 1))
         ambientNp = render.attachNewNode(ambient)
-        self.render.setLight(ambientNp)
+        self.boundsNp.setLight(ambientNp)
 
         self.render.setShaderAuto()
+        self.render.setAntialias(AntialiasAttrib.MAuto)
 
-        for i in range(5):
-            self.addText("Sample %s" % i,
-                         random() * 5, -24, random() * 5)
+        if "sample" in sys.argv:
+            for i in range(5):
+                self.addText("Sample %s" % i,
+                             random() * 5, -24, random() * 5)
 
         self.targets = []
         self.createTarget("A", -2, 5, -1)
@@ -194,11 +188,10 @@ class TextApp(ShowBase):
         text.setTransform(m)
 
         node = BulletRigidBodyNode("Text")
-        np = self.render.attachNewNode(node)
+        np = self.textNp.attachNewNode(node)
         np.setPos(x, y, z)
         tnp = np.attachNewNode(text)
         tnp.setColor(random(), random(), random(), 1)
-        #tnp.setAntialias(AntialiasAttrib.MMultisample)
 
         ul, lr = tnp.getTightBounds()
         halfExtents = (lr - ul) / 2
