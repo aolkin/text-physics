@@ -28,6 +28,7 @@ from direct.actor.Actor import Actor
 from direct.interval.IntervalGlobal import Sequence
 
 from util3d.cube import makeCube
+from util3d.cameratex import CameraTexture, CameraCard
 
 if "help" in sys.argv:
     print("""Command Line Arguments:
@@ -190,6 +191,12 @@ class TextApp(ShowBase):
 
         self.textNp = self.render.attachNewNode("TextNodes")
 
+        self.updateCamera = True
+        self.cameraCard = CameraCard(self.render)
+        self.cameraCard.setScale(Vec3(-16, 1, 9) * 4)
+        self.cameraCard.setTwoSided(True)
+        self.cameraCard.setPos((8 * 4, 22, -4.5 * 4))
+
         light = makeLight(1)
         lightNp = render.attachNewNode(light)
         lightNp.setPos(24, -30, 12)
@@ -229,6 +236,7 @@ class TextApp(ShowBase):
         self.accept('c', self.oobe)
         self.accept('g', self.toggleGravity)
         self.accept('p', self.pause)
+        self.accept('b', self.toggleCameraBg)
 
     def debugNodes(self):
         print("\n".join(["{}\tGravity: {}\tLinear: {}\tAngular: {}".format(
@@ -258,10 +266,17 @@ class TextApp(ShowBase):
             self.world.setGravity((0, 0, 5))
         print("New Gravity: ", self.world.getGravity())
 
+    def toggleCameraBg(self):
+        if self.cameraCard.parent:
+            self.cameraCard.detachNode()
+        else:
+            self.cameraCard.reparentTo(self.render)
+        
     def update(self, task):
         msg = self.queue.get()
         processed = 0
         while msg:
+            print(msg)
             if msg["action"] == "leave":
                 self.launchers[msg["client_id"]].destroy()
                 del self.launchers[msg["client_id"]]
@@ -275,6 +290,9 @@ class TextApp(ShowBase):
                 msg = self.queue.get()
             else:
                 msg = None
+
+        self.updateCamera = not self.updateCamera
+        self.updateCamera and self.cameraCard.update()
 
         dt = globalClock.getDt()
         if not self.paused:
@@ -349,5 +367,6 @@ class TextApp(ShowBase):
         text.setPos(pos)
         return text
 
-app = TextApp()
-app.run()
+if __name__ == "__main__":
+    app = TextApp()
+    app.run()
