@@ -96,7 +96,7 @@ class LaunchableText:
         self.textNp.setScale(2)
 
         self.rbNode.setFriction(0.2)
-        self.rbNode.setRestitution(1)
+        self.rbNode.setRestitution(0.9)
         self.rbNode.setAngularDamping(0.3)
         self.rbNode.setLinearDamping(0)
         self.rbNode.setMass(1)
@@ -190,7 +190,7 @@ class TextApp(ShowBase):
         self.cameraCard = CameraCard(self.render)
         self.cameraCard.setScale(Vec3(-16, 1, 9) * 4)
         self.cameraCard.setTwoSided(True)
-        self.cameraCard.setPos((8 * 4, 22, -4.5 * 4))
+        self.cameraCard.setPos((8 * 4, 22.9, -4.5 * 4))
         if "nocamera" in sys.argv:
             self.toggleCameraBg()
 
@@ -224,9 +224,11 @@ class TextApp(ShowBase):
         self.launchers = defaultdict(
             lambda: LaunchableText(self.textNp, self.world, self.font))
         self.floaters = []
+        self.floatersByRb = {}
 
         self.sinks = []
-        self.createSink("A", 0, 23, 0)
+        self.sinks.append(self.createSink("A", 0, 22, 0))
+        #self.createSink("B", 0, -23, 0)
 
         self.accept('1', self.debugNodes)
         self.accept('k', self.disableKinematic)
@@ -263,8 +265,8 @@ class TextApp(ShowBase):
             self.world.setGravity((0, 0, 5))
         print("New Gravity: ", self.world.getGravity())
 
-    def toggleCameraBg(self):
-        if self.cameraCard.parent:
+    def toggleCameraBg(self, force=None):
+        if force != True and (self.cameraCard.parent or force == False):
             self.cameraCard.detachNode()
         else:
             self.cameraCard.reparentTo(self.render)
@@ -273,7 +275,6 @@ class TextApp(ShowBase):
         msg = self.queue.get()
         processed = 0
         while msg:
-            print(msg)
             if msg["action"] == "leave":
                 self.launchers[msg["client_id"]].destroy()
                 del self.launchers[msg["client_id"]]
@@ -288,10 +289,36 @@ class TextApp(ShowBase):
             else:
                 msg = None
 
-        target = self.sinks[0].getPos()
-        for text in self.floaters:
-            vec = text.rootNp.getPos() - target
-            text.applyCentralForce(-vec / pow(vec.length(), 2) * 100 )
+        for sink in self.sinks:
+            for text in self.floaters:
+                vec = text.rootNp.getPos() - sink.getPos()
+                text.applyCentralForce(-vec / pow(vec.length(), 2) * 80 )
+            textNodes = []
+            for node in sink.node().getOverlappingNodes():
+                if node in self.floatersByRb:
+                    textNodes.append(self.floatersByRb[node])
+            for node in sink.node().getOverlappingNodes():
+                text = (self.floatersByRb[node] if node in self.floatersByRb
+                        else None)
+                if not (node.isStatic() or node.isKinematic()):
+                    # print(node, node.getTotalForce(),
+                    #       node.getTotalForce().length())
+                    if node.getTotalForce().length() > 40:
+                        if len(textNodes) > 1:
+                            i = 0
+                            while textNodes[i] == text:
+                                i += 1
+                            previousNode = textNodes[i]
+                            self.floaters.remove(previousNode)
+                            text.setText(previousNode.textNode.getText() +
+                                         " " + text.textNode.getText())
+                            previousNode.destroy()
+                        else:
+                            pass
+                            #node.setKinematic(True)
+                            #text.setHpr((0, 0, 0))
+                            #self.toggleCameraBg(True)
+                    
 
         self.cameraCard.update()
 
@@ -351,16 +378,17 @@ class TextApp(ShowBase):
                     angular * props["launchStrength"] * 5)
 
         self.floaters.append(text)
+        self.floatersByRb[text.rbNode] = text
         del self.launchers[msg["client_id"]]
 
     def createSink(self, name, x=0, y=0, z=0):
-        shape = BulletSphereShape(0.5)
+        shape = BulletSphereShape(1)
         ghostNode = BulletGhostNode('GhostSink_'+name)
         ghostNode.addShape(shape)
         ghostNp = self.render.attachNewNode(ghostNode)
         ghostNp.setPos(x, y, z)
         self.world.attachGhost(ghostNode)
-        self.sinks.append(ghostNp)
+        return ghostNp
 
     def addText(self, value, pos=Point3(0, 0, 0)):
         text = LaunchableText(self.textNp, self.world, self.font)
