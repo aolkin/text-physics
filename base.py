@@ -9,8 +9,6 @@ from hotqueue import HotQueue
 
 import sys
 
-import pdir
-
 #from direct.showbase.PythonUtil import *
 from panda3d.core import loadPrcFileData
 #loadPrcFileData("", "want-directtools #t")
